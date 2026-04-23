@@ -1,24 +1,17 @@
-"""
-airllm/server.py
+“””
+airllm/server.py — Ollama-compatible HTTP server backed by AirLLM.
 
-Ollama-compatible HTTP server backed by AirLLM layer-streaming inference.
-Exposes the exact endpoints the hackcode Rust binary calls:
-
-GET  /api/tags      → JSON list of available models
-GET  /api/version   → {"version": "…"}
-POST /api/chat      → NDJSON stream  (what hackcode uses for interactive chat)
-POST /api/generate  → NDJSON stream  (used by some one-shot paths)
-POST /api/show      → model info
-POST /api/pull      → acknowledge pull (download handled lazily on first use)
-
-All streaming responses are newline-delimited JSON matching Ollama 0.x exactly.
-"""
-
+Speaks the exact API the hackcode Rust binary calls:
+GET  /api/tags       model list
+GET  /api/version    version string
+POST /api/chat       NDJSON streaming chat
+POST /api/generate   NDJSON streaming generate
+POST /api/show       model info
+POST /api/pull       acknowledge pull (model loads lazily on first use)
+“””
 from **future** import annotations
-
 import argparse
 import datetime
-import gc
 import json
 import os
 import sys
@@ -26,17 +19,13 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
-# Allow running as  python -m airllm.server  from repo root
-
 sys.path.insert(0, str(Path(**file**).resolve().parent.parent))
 
 from airllm.models import list_local, resolve
 
-# ── Loaded model cache ──────────────────────────────────────────────────────
-
-_name:    str | None = None
-_model                = None
-_lock                 = threading.Lock()
+_name:  str | None = None
+_model             = None
+_lock              = threading.Lock()
 
 def _load(name: str) -> None:
 global _name, _model
@@ -47,106 +36,81 @@ if _name == name:
 return
 from airllm.loader import AirLLMLoader
 path   = resolve(name)
-print(f"[AirLLM] Loading {name} from {path}", flush=True)
+print(f”[AirLLM] Loading {name} from {path}”, flush=True)
 _model = AirLLMLoader(path)
 _name  = name
-print(f"[AirLLM] Model ready", flush=True)
-
-# ── NDJSON helpers ──────────────────────────────────────────────────────────
+print(”[AirLLM] Model ready”, flush=True)
 
 def _now() -> str:
-return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+return datetime.datetime.utcnow().strftime(”%Y-%m-%dT%H:%M:%S.%fZ”)
 
 def _chat_line(model: str, text: str, done: bool) -> bytes:
-d: dict = {"model": model, "created_at": _now(),
-"message": {"role": "assistant", "content": text},
-"done": done}
+d: dict = {“model”: model, “created_at”: _now(),
+“message”: {“role”: “assistant”, “content”: text}, “done”: done}
 if done:
-d.update({"total_duration": 0, "load_duration": 0,
-"prompt_eval_count": 0, "eval_count": 0, "eval_duration": 0})
-return (json.dumps(d) + "\n").encode()
+d.update({“total_duration”: 0, “load_duration”: 0,
+“prompt_eval_count”: 0, “eval_count”: 0, “eval_duration”: 0})
+return (json.dumps(d) + “\n”).encode()
 
 def _gen_line(model: str, text: str, done: bool) -> bytes:
-d: dict = {"model": model, "created_at": _now(), "response": text, "done": done}
-return (json.dumps(d) + "\n").encode()
-
-# ── Request handler ─────────────────────────────────────────────────────────
+return (json.dumps({“model”: model, “created_at”: _now(),
+“response”: text, “done”: done}) + “\n”).encode()
 
 class Handler(BaseHTTPRequestHandler):
+def log_message(self, *_): pass
 
 ```
-def log_message(self, *_):
-    pass  # silence default access log
-
-# ── GET ─────────────────────────────────────────────────────────────────
-
 def do_GET(self):
-    if self.path == "/api/tags":
-        self._json({"models": list_local()})
-    elif self.path == "/api/version":
-        self._json({"version": "airllm-0.1"})
-    else:
-        self._json({})
-
-# ── POST ────────────────────────────────────────────────────────────────
+    if   self.path == "/api/tags":    self._json({"models": list_local()})
+    elif self.path == "/api/version": self._json({"version": "airllm-0.1"})
+    else:                             self._json({})
 
 def do_POST(self):
     body = self._body()
     if body is None:
         return
-    if self.path   == "/api/chat":     self._chat(body)
+    if   self.path == "/api/chat":     self._chat(body)
     elif self.path == "/api/generate": self._generate(body)
     elif self.path == "/api/show":     self._show(body)
     elif self.path == "/api/pull":     self._pull(body)
     else:                              self._json({})
 
-# ── Handlers ─────────────────────────────────────────────────────────────
-
 def _chat(self, body: dict):
-    model    = body.get("model", "hackcode-uncensored")
-    messages = body.get("messages", [])
-    opts     = body.get("options", {})
-    kwargs   = {
-        "max_new_tokens": int(opts.get("num_predict", body.get("num_predict", 512))),
-        "temperature":    float(opts.get("temperature", 0.7)),
-        "top_p":          float(opts.get("top_p", 0.95)),
-        "top_k":          int(opts.get("top_k", 40)),
-    }
-
+    model = body.get("model", "hackcode-uncensored")
+    msgs  = body.get("messages", [])
+    opts  = body.get("options", {})
+    kw    = {"max_new_tokens": int(opts.get("num_predict", body.get("num_predict", 512))),
+             "temperature": float(opts.get("temperature", 0.7)),
+             "top_p":       float(opts.get("top_p", 0.95)),
+             "top_k":       int(opts.get("top_k", 40))}
     if not body.get("stream", True):
-        # Non-streaming: collect then return
         _load(model)
-        text = "".join(_model.generate(messages, **kwargs))
+        text = "".join(_model.generate(msgs, **kw))
         return self._json({"model": model, "created_at": _now(),
-                            "message": {"role": "assistant", "content": text},
-                            "done": True})
-
+                           "message": {"role": "assistant", "content": text}, "done": True})
     self._stream_headers()
     try:
         _load(model)
-        for tok in _model.generate(messages, **kwargs):
+        for tok in _model.generate(msgs, **kw):
             self._chunk(_chat_line(model, tok, False))
         self._chunk(_chat_line(model, "", True))
-        self._chunk(b"")  # end chunked transfer
+        self._chunk(b"")
     except BrokenPipeError:
         pass
     except Exception as e:
         print(f"[AirLLM] generation error: {e}", file=sys.stderr)
 
 def _generate(self, body: dict):
-    model    = body.get("model", "hackcode-uncensored")
-    messages = [{"role": "user", "content": body.get("prompt", "")}]
-    opts     = body.get("options", {})
-    kwargs   = {
-        "max_new_tokens": int(opts.get("num_predict", 512)),
-        "temperature":    float(opts.get("temperature", 0.7)),
-        "top_p":          float(opts.get("top_p", 0.95)),
-        "top_k":          int(opts.get("top_k", 40)),
-    }
+    model = body.get("model", "hackcode-uncensored")
+    msgs  = [{"role": "user", "content": body.get("prompt", "")}]
+    opts  = body.get("options", {})
+    kw    = {"max_new_tokens": int(opts.get("num_predict", 512)),
+             "temperature": float(opts.get("temperature", 0.7)),
+             "top_p": float(opts.get("top_p", 0.95))}
     self._stream_headers()
     try:
         _load(model)
-        for tok in _model.generate(messages, **kwargs):
+        for tok in _model.generate(msgs, **kw):
             self._chunk(_gen_line(model, tok, False))
         self._chunk(_gen_line(model, "", True))
         self._chunk(b"")
@@ -159,19 +123,13 @@ def _show(self, body: dict):
                 "details": {"family": "qwen", "format": "safetensors"}})
 
 def _pull(self, body: dict):
-    """
-    Acknowledge the pull request.  Actual download happens lazily when
-    the model is first used in /api/chat or /api/generate.
-    """
     model = body.get("model", "hackcode-uncensored")
     self.send_response(200)
     self.send_header("Content-Type", "application/x-ndjson")
     self.end_headers()
-    for status in ["pulling manifest", f"downloading {model}", "success"]:
-        self.wfile.write((json.dumps({"status": status}) + "\n").encode())
+    for s in ["pulling manifest", f"queued {model}", "success"]:
+        self.wfile.write((json.dumps({"status": s}) + "\n").encode())
         self.wfile.flush()
-
-# ── Helpers ───────────────────────────────────────────────────────────────
 
 def _body(self) -> dict | None:
     n = int(self.headers.get("Content-Length", 0))
@@ -180,8 +138,7 @@ def _body(self) -> dict | None:
     try:
         return json.loads(self.rfile.read(n))
     except Exception as e:
-        self.send_error(400, str(e))
-        return None
+        self.send_error(400, str(e)); return None
 
 def _json(self, obj: dict):
     data = json.dumps(obj).encode()
@@ -198,48 +155,30 @@ def _stream_headers(self):
     self.end_headers()
 
 def _chunk(self, data: bytes):
-    self.wfile.write(f"{len(data):X}\r\n".encode())
-    self.wfile.write(data)
-    self.wfile.write(b"\r\n")
+    self.wfile.write(f"{len(data):X}\r\n".encode() + data + b"\r\n")
     self.wfile.flush()
 ```
 
-# ── Threaded server ─────────────────────────────────────────────────────────
-
-class Server(HTTPServer):
+class _Server(HTTPServer):
 def process_request(self, req, addr):
-threading.Thread(target=self._handle, args=(req, addr), daemon=True).start()
-
-```
-def _handle(self, req, addr):
-    try:
-        self.finish_request(req, addr)
-    except Exception:
-        self.handle_error(req, addr)
-    finally:
-        self.shutdown_request(req)
-```
-
-# ── Entry point ─────────────────────────────────────────────────────────────
+threading.Thread(target=self._h, args=(req, addr), daemon=True).start()
+def _h(self, req, addr):
+try:    self.finish_request(req, addr)
+except: self.handle_error(req, addr)
+finally: self.shutdown_request(req)
 
 def main():
 ap = argparse.ArgumentParser()
-ap.add_argument("–host",  default="127.0.0.1")
-ap.add_argument("–port",  type=int, default=int(os.environ.get("AIRLLM_PORT", 11434)))
-ap.add_argument("–model", default="", help="pre-load a model on startup")
+ap.add_argument(”–host”,  default=“127.0.0.1”)
+ap.add_argument(”–port”,  type=int, default=int(os.environ.get(“AIRLLM_PORT”, 11434)))
+ap.add_argument(”–model”, default=””)
 args = ap.parse_args()
-
-```
 if args.model:
-    threading.Thread(target=_load, args=(args.model,), daemon=True).start()
+threading.Thread(target=_load, args=(args.model,), daemon=True).start()
+srv = _Server((args.host, args.port), Handler)
+print(f”[AirLLM] Listening on {args.host}:{args.port}”, flush=True)
+try:    srv.serve_forever()
+except KeyboardInterrupt: print(”\n[AirLLM] Stopped.”)
 
-srv = Server((args.host, args.port), Handler)
-print(f"[AirLLM] Listening on {args.host}:{args.port}", flush=True)
-try:
-    srv.serve_forever()
-except KeyboardInterrupt:
-    print("\n[AirLLM] Stopped.", flush=True)
-```
-
-if **name** == "**main**":
+if **name** == “**main**”:
 main()
