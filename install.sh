@@ -5,70 +5,70 @@ DIM='\033[0;2m'
 BOLD='\033[1m'
 RED='\033[0;31m'
 NC='\033[0m'
-REPO=“johnesecat/hackcode”
-INSTALL_DIR=”${HOME}/.local/bin”
+REPO="johnesecat/hackcode"
+INSTALL_DIR=”${HOME}/.local/bin"
 
 # ─── Detect Replit ─────────────────────────────────────────────────────────
 
 # Uses a proper if/fi block so set -e can’t trip on the test exit code.
 
 IN_REPLIT=false
-if [ -n “${REPL_ID:-}” ] || [ -n “${REPLIT_DB_URL:-}” ] || [ -n “${REPLIT_CLUSTER:-}” ]; then
+if [ -n "${REPL_ID:-}” ] || [ -n "${REPLIT_DB_URL:-}” ] || [ -n "${REPLIT_CLUSTER:-}” ]; then
 IN_REPLIT=true
 fi
 
-echo “”
-echo -e “${GREEN} ██╗  ██╗ █████╗  ██████╗██╗  ██╗ ██████╗ ██████╗ ██████╗ ███████╗${NC}”
-echo -e “${GREEN} ██║  ██║██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔═══██╗██╔══██╗██╔════╝${NC}”
-echo -e “${GREEN} ███████║███████║██║     █████╔╝ ██║     ██║   ██║██║  ██║█████╗  ${NC}”
-echo -e “${GREEN} ██╔══██║██╔══██║██║     ██╔═██╗ ██║     ██║   ██║██║  ██║██╔══╝  ${NC}”
-echo -e “${GREEN} ██║  ██║██║  ██║╚██████╗██║  ██╗╚██████╗╚██████╔╝██████╔╝███████╗${NC}”
-echo -e “${GREEN} ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝${NC}”
-echo -e “${GREEN}  >> AI-Powered Hacking Terminal  |  100% Local  |  No Censorship <<${NC}”
-echo “”
+echo "”
+echo -e "${GREEN} ██╗  ██╗ █████╗  ██████╗██╗  ██╗ ██████╗ ██████╗ ██████╗ ███████╗${NC}”
+echo -e "${GREEN} ██║  ██║██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔═══██╗██╔══██╗██╔════╝${NC}”
+echo -e "${GREEN} ███████║███████║██║     █████╔╝ ██║     ██║   ██║██║  ██║█████╗  ${NC}”
+echo -e "${GREEN} ██╔══██║██╔══██║██║     ██╔═██╗ ██║     ██║   ██║██║  ██║██╔══╝  ${NC}”
+echo -e "${GREEN} ██║  ██║██║  ██║╚██████╗██║  ██╗╚██████╗╚██████╔╝██████╔╝███████╗${NC}”
+echo -e "${GREEN} ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝${NC}”
+echo -e "${GREEN}  >> AI-Powered Hacking Terminal  |  100% Local  |  No Censorship <<${NC}”
+echo "”
 
 # ─── Detect platform ──────────────────────────────────────
 
 OS=”$(uname -s)”
 ARCH=”$(uname -m)”
-case “$OS” in
-Linux)  PLATFORM=“linux” ;;
-Darwin) PLATFORM=“macos” ;;
+case "$OS” in
+Linux)  PLATFORM="linux” ;;
+Darwin) PLATFORM="macos” ;;
 *)
-echo -e “${RED}Error: Unsupported OS: $OS${NC}”
-echo “HackCode supports Linux and macOS.”
+echo -e "${RED}Error: Unsupported OS: $OS${NC}”
+echo "HackCode supports Linux and macOS.”
 exit 1
 ;;
 esac
-case “$ARCH” in
-x86_64|amd64)   ARCH_NAME=“x64” ;;
-arm64|aarch64)  ARCH_NAME=“arm64” ;;
+case "$ARCH” in
+x86_64|amd64)   ARCH_NAME="x64” ;;
+arm64|aarch64)  ARCH_NAME="arm64” ;;
 *)
-echo -e “${RED}Error: Unsupported architecture: $ARCH${NC}”
-echo “HackCode supports x86_64 and arm64.”
+echo -e "${RED}Error: Unsupported architecture: $ARCH${NC}”
+echo "HackCode supports x86_64 and arm64.”
 exit 1
 ;;
 esac
-ARTIFACT=“hackcode-${PLATFORM}-${ARCH_NAME}”
-echo -e “${GREEN}[1/5]${NC} Detected: ${BOLD}${OS} ${ARCH}${NC} -> ${ARTIFACT}”
+ARTIFACT="hackcode-${PLATFORM}-${ARCH_NAME}”
+echo -e "${GREEN}[1/5]${NC} Detected: ${BOLD}${OS} ${ARCH}${NC} -> ${ARTIFACT}”
 
 # ─── Try downloading pre-built binary ─────────────────────
 
-echo -e “${GREEN}[2/5]${NC} Getting HackCode…”
+echo -e "${GREEN}[2/5]${NC} Getting HackCode…”
 INSTALLED=false
-TAG=$(curl -sL “https://api.github.com/repos/${REPO}/releases/latest” 2>/dev/null | grep ‘“tag_name”’ | head -1 | sed -E ‘s/.*“tag_name”: *”([^”]+)”.*/\1/’ || true)
-if [ -n “$TAG” ]; then
-DOWNLOAD_URL=“https://github.com/${REPO}/releases/download/${TAG}/${ARTIFACT}.tar.gz”
+TAG=$(curl -sL "https://api.github.com/repos/${REPO}/releases/latest” 2>/dev/null | grep ‘"tag_name”’ | head -1 | sed -E ‘s/.*"tag_name”: *”([^”]+)”.*/\1/’ || true)
+if [ -n "$TAG” ]; then
+DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ARTIFACT}.tar.gz”
 TMPDIR_DL=$(mktemp -d)
-trap ‘rm -rf “$TMPDIR_DL”’ EXIT
-HTTP_CODE=$(curl -sL -w “%{http_code}” -o “$TMPDIR_DL/${ARTIFACT}.tar.gz” “$DOWNLOAD_URL” 2>/dev/null || echo “000”)
-if [ “$HTTP_CODE” = “200” ]; then
-cd “$TMPDIR_DL”
-tar xzf “${ARTIFACT}.tar.gz”
-mkdir -p “$INSTALL_DIR”
-mv “$ARTIFACT” “$INSTALL_DIR/hackcode”
-chmod +x “$INSTALL_DIR/hackcode”
-echo -e “  ${GREEN}Downloaded ${TAG} ✓${NC}”
+trap ‘rm -rf "$TMPDIR_DL”’ EXIT
+HTTP_CODE=$(curl -sL -w "%{http_code}” -o "$TMPDIR_DL/${ARTIFACT}.tar.gz” "$DOWNLOAD_URL” 2>/dev/null || echo "000”)
+if [ "$HTTP_CODE” = "200” ]; then
+cd "$TMPDIR_DL”
+tar xzf "${ARTIFACT}.tar.gz”
+mkdir -p "$INSTALL_DIR”
+mv "$ARTIFACT” "$INSTALL_DIR/hackcode”
+chmod +x "$INSTALL_DIR/hackcode”
+echo -e "  ${GREEN}Downloaded ${TAG} ✓${NC}”
 INSTALLED=true
 cd - >/dev/null
 fi
@@ -76,8 +76,8 @@ fi
 
 # Fall back to building from source
 
-if [ “$INSTALLED” = false ]; then
-echo -e “  ${DIM}No pre-built binary available. Building from source…${NC}”
+if [ "$INSTALLED” = false ]; then
+echo -e "  ${DIM}No pre-built binary available. Building from source…${NC}”
 
 ```
 # ── Rust toolchain ────────────────────────────────────────────────────
@@ -170,27 +170,27 @@ fi
 
 # ─── Add to PATH ──────────────────────────────────────────
 
-echo -e “${GREEN}[3/5]${NC} Adding hackcode to PATH…”
-SHELL_NAME=$(basename “${SHELL:-bash}”)
+echo -e "${GREEN}[3/5]${NC} Adding hackcode to PATH…”
+SHELL_NAME=$(basename "${SHELL:-bash}”)
 RC=””
-case “$SHELL_NAME” in
+case "$SHELL_NAME” in
 zsh)  RC=”${ZDOTDIR:-$HOME}/.zshrc” ;;
 bash) RC=”$HOME/.bashrc”
-[ -f “$HOME/.bash_profile” ] && RC=”$HOME/.bash_profile” ;;
+[ -f "$HOME/.bash_profile” ] && RC=”$HOME/.bash_profile” ;;
 fish) RC=”$HOME/.config/fish/config.fish” ;;
 esac
-if [ -n “$RC” ]; then
-if ! grep -Fq “$INSTALL_DIR” “$RC” 2>/dev/null; then
-echo “” >> “$RC”
-echo “# HackCode” >> “$RC”
-if [ “$SHELL_NAME” = “fish” ]; then
-echo “fish_add_path $INSTALL_DIR” >> “$RC”
+if [ -n "$RC” ]; then
+if ! grep -Fq "$INSTALL_DIR” "$RC” 2>/dev/null; then
+echo "” >> "$RC”
+echo "# HackCode” >> "$RC”
+if [ "$SHELL_NAME” = "fish” ]; then
+echo "fish_add_path $INSTALL_DIR” >> "$RC”
 else
-echo “export PATH="$INSTALL_DIR:$PATH"” >> “$RC”
+echo "export PATH="$INSTALL_DIR:$PATH"” >> "$RC”
 fi
-echo -e “  ${GREEN}Added to $RC ✓${NC}”
+echo -e "  ${GREEN}Added to $RC ✓${NC}”
 else
-echo -e “  ${DIM}Already in PATH ✓${NC}”
+echo -e "  ${DIM}Already in PATH ✓${NC}”
 fi
 fi
 export PATH=”$INSTALL_DIR:$PATH”
@@ -204,7 +204,7 @@ export PATH=”$INSTALL_DIR:$PATH”
 # Everywhere else: original Ollama logic, byte-for-byte unchanged.
 
 if $IN_REPLIT; then
-echo -e “${GREEN}[4/5]${NC} Installing AirLLM (Ollama-compatible layer-streaming backend)…”
+echo -e "${GREEN}[4/5]${NC} Installing AirLLM (Ollama-compatible layer-streaming backend)…”
 
 ```
 # ── Find Python 3.10+ ─────────────────────────────────────────────────
@@ -267,84 +267,84 @@ echo -e "  ${DIM}Run: bash run.sh   (starts AirLLM server then launches hackcode
 
 else
 # ─── Original Ollama + Model logic (unchanged) ──────────────────────
-echo -e “${GREEN}[4/5]${NC} Pulling AI model…”
+echo -e "${GREEN}[4/5]${NC} Pulling AI model…”
 OLLAMA_BIN=””
 if command -v ollama &>/dev/null; then
-OLLAMA_BIN=“ollama”
-elif [ -x “/Applications/Ollama.app/Contents/Resources/ollama” ]; then
+OLLAMA_BIN="ollama”
+elif [ -x "/Applications/Ollama.app/Contents/Resources/ollama” ]; then
 OLLAMA_BIN=”/Applications/Ollama.app/Contents/Resources/ollama”
 fi
-if [ -n “$OLLAMA_BIN” ]; then
-echo -e “  ${GREEN}Ollama found ✓${NC}”
-if $OLLAMA_BIN list 2>/dev/null | grep -q “hackcode-uncensored”; then
-echo -e “  ${GREEN}hackcode-uncensored model ready ✓${NC}”
+if [ -n "$OLLAMA_BIN” ]; then
+echo -e "  ${GREEN}Ollama found ✓${NC}”
+if $OLLAMA_BIN list 2>/dev/null | grep -q "hackcode-uncensored”; then
+echo -e "  ${GREEN}hackcode-uncensored model ready ✓${NC}”
 else
 RAM_GB=8
-case “$PLATFORM” in
-macos) RAM_GB=$(sysctl -n hw.memsize 2>/dev/null | awk ‘{printf “%d”, $1/1073741824}’) ;;
-linux) RAM_GB=$(awk ‘/MemTotal/{printf “%d”, $2/1048576}’ /proc/meminfo 2>/dev/null) ;;
+case "$PLATFORM” in
+macos) RAM_GB=$(sysctl -n hw.memsize 2>/dev/null | awk ‘{printf "%d”, $1/1073741824}’) ;;
+linux) RAM_GB=$(awk ‘/MemTotal/{printf "%d”, $2/1048576}’ /proc/meminfo 2>/dev/null) ;;
 esac
 BASE_MODEL=””
 MODEL_DESC=””
-if [ “$RAM_GB” -ge 24 ]; then
-BASE_MODEL=“tripolskypetr/qwen3.5-uncensored-aggressive:35b”
-MODEL_DESC=“Qwen3.5-35B-A3B MoE Uncensored (~21GB)”
-elif [ “$RAM_GB” -ge 8 ]; then
-BASE_MODEL=“qwen3:8b”
-MODEL_DESC=“Qwen3-8B (~5GB)”
+if [ "$RAM_GB” -ge 24 ]; then
+BASE_MODEL="tripolskypetr/qwen3.5-uncensored-aggressive:35b”
+MODEL_DESC="Qwen3.5-35B-A3B MoE Uncensored (~21GB)”
+elif [ "$RAM_GB” -ge 8 ]; then
+BASE_MODEL="qwen3:8b”
+MODEL_DESC="Qwen3-8B (~5GB)”
 else
-BASE_MODEL=“tripolskypetr/qwen3.5-uncensored-aggressive:4b”
-MODEL_DESC=“Qwen3.5-4B Uncensored (~3GB)”
+BASE_MODEL="tripolskypetr/qwen3.5-uncensored-aggressive:4b”
+MODEL_DESC="Qwen3.5-4B Uncensored (~3GB)”
 fi
-echo “”
-echo -e “  ${DIM}RAM: ${RAM_GB}GB — pulling ${BOLD}${MODEL_DESC}${NC}”
-echo “”
+echo "”
+echo -e "  ${DIM}RAM: ${RAM_GB}GB — pulling ${BOLD}${MODEL_DESC}${NC}”
+echo "”
 PULLED=false
-for TRY_MODEL in “$BASE_MODEL” “qwen3:8b” “tripolskypetr/qwen3.5-uncensored-aggressive:4b” “qwen3:4b”; do
-if $OLLAMA_BIN pull “$TRY_MODEL”; then
+for TRY_MODEL in "$BASE_MODEL” "qwen3:8b” "tripolskypetr/qwen3.5-uncensored-aggressive:4b” "qwen3:4b”; do
+if $OLLAMA_BIN pull "$TRY_MODEL”; then
 BASE_MODEL=”$TRY_MODEL”
 PULLED=true
 break
 fi
-echo -e “  ${DIM}$TRY_MODEL not available, trying next…${NC}”
+echo -e "  ${DIM}$TRY_MODEL not available, trying next…${NC}”
 done
-if [ “$PULLED” = true ]; then
-echo -e “  ${GREEN}Model pulled ✓${NC}”
-echo -e “${GREEN}[5/5]${NC} Creating hackcode-uncensored model…”
+if [ "$PULLED” = true ]; then
+echo -e "  ${GREEN}Model pulled ✓${NC}”
+echo -e "${GREEN}[5/5]${NC} Creating hackcode-uncensored model…”
 HACKCODE_CFG=”${HOME}/.config/hackcode”
-mkdir -p “$HACKCODE_CFG”
-cat > “${HACKCODE_CFG}/Modelfile” << MODELFILE
+mkdir -p "$HACKCODE_CFG”
+cat > "${HACKCODE_CFG}/Modelfile” << MODELFILE
 FROM ${BASE_MODEL}
 PARAMETER temperature 0.7
 PARAMETER num_ctx 32768
 MODELFILE
-$OLLAMA_BIN create hackcode-uncensored -f “${HACKCODE_CFG}/Modelfile”
-echo -e “  ${GREEN}hackcode-uncensored ready ✓${NC}”
+$OLLAMA_BIN create hackcode-uncensored -f "${HACKCODE_CFG}/Modelfile”
+echo -e "  ${GREEN}hackcode-uncensored ready ✓${NC}”
 else
-echo -e “  ${RED}Could not pull any model${NC}”
-echo -e “  ${DIM}Run: ollama pull qwen3:8b && hackcode –setup${NC}”
+echo -e "  ${RED}Could not pull any model${NC}”
+echo -e "  ${DIM}Run: ollama pull qwen3:8b && hackcode –setup${NC}”
 fi
 fi
 else
-echo -e “  ${RED}Ollama not found${NC} — required for local AI”
-if [ “$PLATFORM” = “macos” ]; then
-echo -e “  ${DIM}Install: brew install ollama  ${NC}or${DIM}  https://ollama.ai/download${NC}”
+echo -e "  ${RED}Ollama not found${NC} — required for local AI”
+if [ "$PLATFORM” = "macos” ]; then
+echo -e "  ${DIM}Install: brew install ollama  ${NC}or${DIM}  https://ollama.ai/download${NC}”
 else
-echo -e “  ${DIM}Install: curl -fsSL https://ollama.ai/install.sh | sh${NC}”
+echo -e "  ${DIM}Install: curl -fsSL https://ollama.ai/install.sh | sh${NC}”
 fi
 fi
 fi
 
 # ─── Done ─────────────────────────────────────────────────
 
-echo “”
-echo -e “${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}”
-echo -e “${GREEN}[HackCode]${NC} Installation complete!”
-echo “”
-echo -e “  ${BOLD}hackcode${NC}          ${DIM}# Start hacking${NC}”
-echo -e “  ${BOLD}hackcode –help${NC}   ${DIM}# Show all commands${NC}”
-echo “”
-echo -e “  ${DIM}Open a new terminal or run:${NC}”
-echo -e “  ${BOLD}export PATH="$INSTALL_DIR:$PATH"${NC}”
-echo -e “${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}”
-echo “”
+echo "”
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}”
+echo -e "${GREEN}[HackCode]${NC} Installation complete!”
+echo "”
+echo -e "  ${BOLD}hackcode${NC}         ${DIM}# Start hacking${NC}”
+echo -e "  ${BOLD}hackcode –help${NC}   ${DIM}# Show all commands${NC}”
+echo "”
+echo -e "  ${DIM}Open a new terminal or run:${NC}”
+echo -e "  ${BOLD}export PATH="$INSTALL_DIR:$PATH"${NC}”
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}”
+echo "”
