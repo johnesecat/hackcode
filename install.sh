@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-GREEN=’\033[38;2;0;255;65m’
-DIM=’\033[0;2m’
-BOLD=’\033[1m’
-RED=’\033[0;31m’
-NC=’\033[0m’
+GREEN='\033[38;2;0;255;65m'
+DIM='\033[0;2m'
+BOLD='\033[1m'
+RED='\033[0;31m'
+NC='\033[0m'
 REPO=“johnesecat/hackcode”
 INSTALL_DIR=”${HOME}/.local/bin”
 
