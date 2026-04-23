@@ -1,53 +1,85 @@
 #!/usr/bin/env bash
 
-# run.sh -- Replit launcher: start AirLLM server, then exec hackcode.
+# run.sh — Replit launcher.
 
-# On non-Replit systems just run: hackcode
+# 1. Ensures hackcode is installed.
+
+# 2. Starts AirLLM server on 127.0.0.1:11434 (if not already running).
+
+# 3. exec hackcode, passing all args through.
 
 set -euo pipefail
 
-INSTALL_DIR="${HOME}/.local/bin"
-export PATH="${INSTALL_DIR}:${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
-export OLLAMA_HOST="http://127.0.0.1:11434"
+export OLLAMA_HOST=”${OLLAMA_HOST:-http://127.0.0.1:11434}”
+export CARGO_HOME=”${CARGO_HOME:-${HOME}/.cargo}”
+export RUSTUP_HOME=”${RUSTUP_HOME:-${HOME}/.rustup}”
+export PATH=”${HOME}/.local/bin:${CARGO_HOME}/bin:${PATH}”
 
-# Locate airllm/ relative to this script
+SCRIPT_DIR=”$(cd “$(dirname “${BASH_SOURCE[0]}”)” && pwd)”
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "${SCRIPT_DIR}/airllm/server.py" ]; then
-AIRLLM_PARENT="${SCRIPT_DIR}"
-elif [ -f "${HOME}/.hackcode-src/airllm/server.py" ]; then
-AIRLLM_PARENT="${HOME}/.hackcode-src"
-else
-echo "airllm/ not found -- run install.sh first" >&2
+# ── 1. Install if not done yet ─────────────────────────────────────────────
+
+if [ ! -f “${HOME}/.local/bin/hackcode” ]; then
+echo “First run — running install.sh…”
+bash “${SCRIPT_DIR}/install.sh”
+fi
+
+# ── 2. Locate airllm/ ──────────────────────────────────────────────────────
+
+AIRLLM_PARENT=””
+if [ -f “${SCRIPT_DIR}/airllm/server.py” ]; then
+AIRLLM_PARENT=”${SCRIPT_DIR}”
+elif [ -f “${HOME}/.hackcode-src/airllm/server.py” ]; then
+AIRLLM_PARENT=”${HOME}/.hackcode-src”
+fi
+
+if [ -z “$AIRLLM_PARENT” ]; then
+echo “airllm/ not found. Re-running install.sh…” >&2
+bash “${SCRIPT_DIR}/install.sh”
+AIRLLM_PARENT=”${HOME}/.hackcode-src”
+fi
+export PYTHONPATH=”${AIRLLM_PARENT}:${PYTHONPATH:-}”
+
+# ── 3. Resolve python ──────────────────────────────────────────────────────
+
+PYTHON=””
+for _py in python3.12 python3.11 python3.10 python3; do
+command -v “$_py” &>/dev/null && PYTHON=”$_py” && break
+done
+if [ -z “$PYTHON” ]; then
+echo “python3 not found. Add python3 to replit.nix.” >&2
 exit 1
 fi
-export PYTHONPATH="${AIRLLM_PARENT}:${PYTHONPATH:-}"
 
-# Resolve Python
+# ── 4. Start AirLLM server if not already running ──────────────────────────
 
-PYTHON=""
-for _py in python3.12 python3.11 python3.10 python3; do
-command -v "$_py" &>/dev/null && PYTHON="$_py" && break
-done
-[ -z "$PYTHON" ] && { echo "python3 not found" >&2; exit 1; }
-
-# Start AirLLM server if not already running
-
-if ! curl -sf "${OLLAMA_HOST}/api/tags" >/dev/null 2>&1; then
-mkdir -p "${HOME}/.hackcode"
+if ! curl -sf “${OLLAMA_HOST}/api/tags” >/dev/null 2>&1; then
+mkdir -p “${HOME}/.hackcode”
+LOG=”${HOME}/.hackcode/airllm.log”
 printf ‘\033[38;2;0;255;65m[AirLLM]\033[0m Starting layer-streaming server…\n’
-nohup "$PYTHON" -m airllm.server   
->"${HOME}/.hackcode/airllm.log" 2>&1 &
-# Wait up to 30 s
+# Run in background; nohup survives the shell exiting on mobile
+nohup “$PYTHON” -m airllm.server >”$LOG” 2>&1 &
+_pid=$!
+# Wait up to 30 s for the server to become ready
+_ready=false
 for _i in $(seq 1 30); do
 sleep 1
-curl -sf "${OLLAMA_HOST}/api/tags" >/dev/null 2>&1 && break
+if curl -sf “${OLLAMA_HOST}/api/tags” >/dev/null 2>&1; then
+_ready=true
+break
+fi
 done
-curl -sf "${OLLAMA_HOST}/api/tags" >/dev/null 2>&1   
-&& printf ‘\033[38;2;0;255;65m[AirLLM]\033[0m Server ready\n’   
-|| { printf ‘\033[0;31m[AirLLM] Server failed to start. Check ~/.hackcode/airllm.log\033[0m\n’; exit 1; }
+if $_ready; then
+printf ‘\033[38;2;0;255;65m[AirLLM]\033[0m Server ready (pid %s)\n’ “$_pid”
 else
-printf ‘\033[2m[AirLLM] Server already running\033[0m\n’
+printf ‘\033[0;31m[AirLLM] Server did not start in 30s.\033[0m\n’
+printf ‘\033[2mCheck log: %s\033[0m\n’ “$LOG”
+exit 1
+fi
+else
+printf ‘\033[2m[AirLLM] Server already running.\033[0m\n’
 fi
 
-exec hackcode "$@"  
+# ── 5. Launch hackcode ──────────────────────────────────────────────────────
+
+exec hackcode “$@”
