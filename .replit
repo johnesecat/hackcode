@@ -1,0 +1,12 @@
+RUSTUP_HOME = "/home/runner/.rustup"
+AIRLLM_INT8 = "1"
+OLLAMA_HOST = "http://127.0.0.1:11434"
+[env]
+
+channel = "stable-24_05"
+[nix]
+
+language = "nix"
+entrypoint = "run.sh"
+run = "bash run.sh"
+CARGO_HOME  = "/home/runner/.cargo"
