@@ -9,7 +9,7 @@ POST /api/generate   NDJSON streaming generate
 POST /api/show       model info
 POST /api/pull       acknowledge pull (model loads lazily on first use)
 """
-from **future** import annotations
+from __future__ import annotations
 import argparse
 import datetime
 import json
@@ -19,7 +19,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
-sys.path.insert(0, str(Path(**file**).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from airllm.models import list_local, resolve
 
