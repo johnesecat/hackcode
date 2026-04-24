@@ -54,11 +54,11 @@ echo -e "${GREEN}[1/5]${NC} Detected: ${BOLD}${OS} ${ARCH}${NC} -> ${ARTIFACT}"
 
 echo -e "${GREEN}[2/5]${NC} Getting HackCode…"
 INSTALLED=false
-TAG=$(curl -sL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep ‘"tag_name"' | head -1 | sed -E ‘s/.*"tag_name": *"([^"]+)".*/\1/' || true)
+TAG=$(curl -sL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' || true)
 if [ -n "$TAG" ]; then
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ARTIFACT}.tar.gz"
     TMPDIR_DL=$(mktemp -d)
-    trap ‘rm -rf "$TMPDIR_DL"' EXIT
+    trap 'rm -rf "$TMPDIR_DL"' EXIT
     HTTP_CODE=$(curl -sL -w "%{http_code}" -o "$TMPDIR_DL/${ARTIFACT}.tar.gz" "$DOWNLOAD_URL" 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "200" ]; then
         cd "$TMPDIR_DL"
@@ -274,8 +274,8 @@ else
         else
             RAM_GB=8
             case "$PLATFORM" in
-                macos) RAM_GB=$(sysctl -n hw.memsize 2>/dev/null | awk ‘{printf "%d", $1/1073741824}') ;;
-                linux) RAM_GB=$(awk ‘/MemTotal/{printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null) ;;
+                macos) RAM_GB=$(sysctl -n hw.memsize 2>/dev/null | awk '{printf "%d", $1/1073741824}') ;;
+                linux) RAM_GB=$(awk '/MemTotal/{printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null) ;;
             esac
             BASE_MODEL=""
             MODEL_DESC=""
