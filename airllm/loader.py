@@ -1,4 +1,4 @@
-“””
+"""
 airllm/loader.py — Layer-streaming causal-LM inference.
 
 Loads one transformer block at a time from memory-mapped safetensors,
@@ -13,7 +13,7 @@ LLaMA-2/3, Mistral, Gemma 2  (same weight naming convention)
 Quantisation:
 AIRLLM_INT8=1 (default)  →  symmetric per-row int8, ~2× RAM reduction
 AIRLLM_INT8=0            →  fp16, full precision
-“””
+"""
 from **future** import annotations
 import gc
 import json
@@ -27,7 +27,7 @@ import torch.nn.functional as F
 from safetensors import safe_open
 from transformers import AutoConfig, AutoTokenizer
 
-INT8 = os.environ.get(“AIRLLM_INT8”, “1”) == “1”
+INT8 = os.environ.get("AIRLLM_INT8", "1") == "1"
 
 # ── Math ───────────────────────────────────────────────────────────────────
 
@@ -63,15 +63,15 @@ def _linear(x: torch.Tensor, w: torch.Tensor,
 # ── Shard index ─────────────────────────────────────────────────────────────
 
 def _index(model_path: Path) -> dict[str, Path]:
-    idx = model_path / “model.safetensors.index.json”
+    idx = model_path / "model.safetensors.index.json"
     if idx.exists():
         with open(idx) as f:
-            return {k: model_path / v for k, v in json.load(f)[“weight_map”].items()}
-    single = model_path / “model.safetensors”
+            return {k: model_path / v for k, v in json.load(f)["weight_map"].items()}
+    single = model_path / "model.safetensors"
     if single.exists():
-        with safe_open(single, framework=“pt”) as f:
+        with safe_open(single, framework="pt") as f:
             return {k: single for k in f.keys()}
-    raise FileNotFoundError(f”No safetensors weights in {model_path}”)
+    raise FileNotFoundError(f"No safetensors weights in {model_path}")
 
 # ── Loader ──────────────────────────────────────────────────────────────────
 
